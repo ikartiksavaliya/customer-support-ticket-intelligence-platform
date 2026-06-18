@@ -9,7 +9,7 @@ This log tracks every empirical run across our representation, architecture, emb
 All studies are evaluated under identical conditions:
 * **Train / Val / Test Split**: 80% / 10% / 10%
 * **Hardware**: CPU (Inference Benchmarks run on single core thread)
-* **Target Metric**: Category Classification (10 classes)
+* **Target Metric**: Category Classification (18 classes)
 
 ---
 

@@ -1,33 +1,40 @@
 # Error Analysis Report
 
-This document outlines our diagnostic framework for auditing model misclassifications, tracking confusion patterns, and understanding error distributions.
+This document outlines our diagnostic framework for auditing model misclassifications, tracking confusion patterns, and understanding error distributions in the CFPB Consumer Complaint classification model.
 
 ---
 
 ## 🔍 Diagnostic Framework
 
-When the model makes an incorrect prediction, we classify the error into one of the following categories:
+When the model makes an incorrect prediction, we classify the error into one of the following categories to guide our iterative improvement process:
 
-1. **Semantic Ambiguity**: The ticket text contains words associated with multiple categories. (e.g., *"crashes"* could mean `Bug Report` or `Performance Issue`).
-2. **Label Noise (Dataset Issue)**: The ground-truth label was assigned randomly, or does not match the actual semantic content of the text.
-3. **Out-of-Vocabulary (OOV) Shift**: The text contains key terms that were not present in the model's vocabulary.
-4. **Sequence Length Saturation**: Truncation cut off critical words, or padding dominated the sequence state.
+1. **Semantic Ambiguity & Class Overlap**:
+   - The ticket text contains words associated with multiple similar categories.
+   - *Example*: A complaint about an unauthorized credit card charge might contain text highly relevant to both `Credit card` and `Debt collection` (if sent to collections).
+2. **Extreme Class Imbalance Bias**:
+   - The model predicts the majority class (`Debt collection` or `Credit reporting...`) because of training distribution skew, ignoring subtle minority class signals.
+3. **Out-of-Vocabulary (OOV) / Sub-word Shift**:
+   - The narrative contains key financial terms, specific company names, or typos that were mapped to `<UNK>` during vocabulary construction, causing the sequence model to lose critical semantic context.
+4. **Sequence Truncation**:
+   - Critical details explaining the complaint were located beyond our max sequence length threshold (e.g., in the middle/end of a 1,000-word narrative) and were truncated.
+5. **Noisy Text & Masking Patterns**:
+   - An excess of anonymized tokens (`XXXX`, `XX/XX/XXXX`) makes it difficult for recurrent layers to capture coherent syntactic structure and context.
 
 ---
 
 ## 📊 Error Audit Template
 
-We will extract misclassified tickets and log them in the following tabular format in `/outputs/misclassified_audit.csv`:
+We will extract misclassified complaints and log them in the following tabular format in `outputs/misclassified_tickets.csv` during evaluation phases:
 
-| Ticket ID | Text Input | Ground Truth | Predicted | Confidence | Error Category |
+| Ticket ID | Text Input (Truncated) | Ground Truth Product | Predicted Product | Confidence Score | Error Category |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | | | | | | |
 
 ---
 
-## ⚠️ Key Insights from Initial Data Profiling
+## 📈 Diagnostic & Improvement Plan
 
-Because our exploratory analysis proved that **the dataset's target classes are randomly assigned and independent of the text content**:
-- **Uniform Error Distribution**: We expect misclassifications to be distributed uniformly across all categories (no single class will have significantly better precision or recall on validation data).
-- **Confusion Matrix Baseline**: The off-diagonal entries of our confusion matrix will show uniform numbers (~10% across all cells).
-- **Resolution Plan**: This represents a classic "label noise" limit. In a production setting, we would need to relabel the dataset using domain experts or weak supervision. For this pedagogical study, we will use this framework to demonstrate how to audit predictions, calculate confidence scores, and identify OOV words.
+Based on initial data profiling and class distribution skew:
+- **Confusion Matrix Auditing**: We will monitor confusion matrices specifically to identify pairwise confusion (e.g., checking if `Credit reporting` is constantly misclassified as the broader `Credit reporting, credit repair services...` class).
+- **OOV Analysis**: During inference, we will track the ratio of OOV tokens in misclassified versus correctly classified tickets to determine if we need to raise our vocabulary threshold or switch to subword tokenization (BPE/WordPiece).
+- **Dynamic Padding/Truncation Study**: We will experiment with truncation locations (pre-truncation vs post-truncation) to see if consumers write their most descriptive product cues at the very beginning or the end of their complaints.

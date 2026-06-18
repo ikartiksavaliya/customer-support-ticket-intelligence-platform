@@ -1,81 +1,71 @@
 # Dataset Profile
 
-This profile summarizes the statistics, sequence characteristics, and quality observations of the customer support ticket dataset.
+This profile summarizes the statistics, sequence characteristics, and quality observations of the active customer support ticket modeling dataset (`df_sample`).
 
 ---
 
 ## 📊 Dataset Statistics
 
-* **Total Samples**: 200,000
-* **Unique Categories (Classes)**: 10
-* **Unique Priorities (Classes)**: 4
+* **Total Samples**: 200,000 (after exact deduplication and stratified sampling)
+* **Unique Categories (Classes)**: 18
+* **Raw Columns Retained**: `issue_description` (mapped from *Consumer complaint narrative*), `category` (mapped from *Product*)
 
 ### Class Distributions
-
-#### 1. Ticket Category
-The target classes are uniformly distributed, meaning there is **no class imbalance**:
+Unlike the previous synthetic dataset, the real-world CFPB dataset is **highly imbalanced**, spanning 18 financial service categories:
 
 | Category | Counts | Percentage |
 | :--- | :--- | :--- |
-| Feature Request | 20,169 | 10.08% |
-| Subscription Cancellation | 20,096 | 10.05% |
-| Performance Issue | 20,074 | 10.04% |
-| Security Concern | 20,040 | 10.02% |
-| Login Issue | 20,002 | 10.00% |
-| Payment Problem | 19,997 | 10.00% |
-| Bug Report | 19,981 | 9.99% |
-| Refund Request | 19,900 | 9.95% |
-| Data Sync Issue | 19,877 | 9.94% |
-| Account Suspension | 19,864 | 9.93% |
-
-#### 2. Ticket Priority
-The priority attribute is also uniformly split:
-
-| Priority | Counts | Percentage |
-| :--- | :--- | :--- |
-| High | 50,241 | 25.12% |
-| Urgent | 50,143 | 25.07% |
-| Medium | 49,854 | 24.93% |
-| Low | 49,762 | 24.88% |
+| Debt collection | 45,934 | 22.97% |
+| Credit reporting, credit repair services, or other personal consumer reports | 43,836 | 21.92% |
+| Mortgage | 28,843 | 14.42% |
+| Credit reporting | 16,249 | 8.12% |
+| Student loan | 11,866 | 5.93% |
+| Credit card or prepaid card | 11,599 | 5.80% |
+| Credit card | 10,218 | 5.11% |
+| Bank account or service | 8,093 | 4.05% |
+| Checking or savings account | 7,005 | 3.50% |
+| Consumer Loan | 5,144 | 2.57% |
+| Vehicle loan or lease | 3,116 | 1.56% |
+| Money transfer, virtual currency, or money service | 2,973 | 1.49% |
+| Payday loan, title loan, or personal loan | 2,405 | 1.20% |
+| Payday loan | 948 | 0.47% |
+| Money transfers | 815 | 0.41% |
+| Prepaid card | 789 | 0.39% |
+| Other financial service | 159 | 0.08% |
+| Virtual currency | 8 | 0.00% |
 
 ---
 
 ## 🔠 Sequence Length Statistics (`issue_description`)
 
-The dataset text has highly regular, narrow word count ranges.
+The text complaints show high variance in sequence lengths, requiring careful padding/truncation strategies.
 
 | Metric | Characters | Words (Whitespace split) |
 | :--- | :--- | :--- |
-| **Average** | 65.92 | 11.01 |
-| **Median** | 68.00 | 11.00 |
-| **Minimum** | 55.00 | 9.00 |
-| **Maximum** | 79.00 | 13.00 |
+| **Average** | 1,115.21 | 202.92 |
+| **Median (50%)** | 774.00 | 141.00 |
+| **Minimum** | 5.00 | 1.00 |
+| **25th Percentile** | 412.00 | 75.00 |
+| **75th Percentile** | 1,405.00 | 256.00 |
+| **Maximum** | 31,735.00 | 6,314.00 |
 
 ---
 
 ## 🔤 Vocabulary Size
 
-* **Estimated Unique Vocabulary Size**: **80 words** (lowercased, punctuation removed).
-* This is extremely compact and represents a highly simplified, synthetic vocabulary space.
+* **Estimated Unique Vocabulary Size**: **79,605 words** (lowercased, whitespace split, basic punctuation removed).
+* This is a massive, real-world vocabulary containing spelling errors, specific terminology, abbreviations, and anonymized placeholders (e.g., `XXXX`, `XX`).
 
 ---
 
 ## 📝 Text Quality Observations & Representative Examples
 
-The text values in `issue_description` consist of **exactly 10 unique template sentences**. There are no typos, grammatical variations, slang, or emojis, which makes it a very clean, structured, yet synthetic text column.
+The text values in `issue_description` consist of real, unedited consumer complaints submitted to the CFPB. They present several challenges for deep learning model training:
 
-### The 10 Unique Sentences
-1. `"The payment was deducted from my bank account but the transaction shows failed."`
-2. `"I found a bug in the latest update affecting report generation."`
-3. `"The application crashes whenever I try to upload a file."`
-4. `"My subscription was cancelled without my request and I need clarification."`
-5. `"The system is not syncing data across devices properly."`
-6. `"There seems to be a discrepancy in my billing statement for this month."`
-7. `"I would like to request a refund for the recent charge."`
-8. `"Two-factor authentication codes are not being delivered to my phone."`
-9. `"I am experiencing very slow performance while using the dashboard."`
-10. `"I am unable to access my account after entering the correct credentials."`
+1. **Anonymization / Redaction Masking**: Important names, dates, amounts, and account numbers are replaced with strings like `XXXX` or `XX/XX/XXXX`. These tokens will appear frequently in the vocabulary.
+2. **High Imbalance and Semantic Overlap**: Categories like `Credit reporting` and `Credit reporting, credit repair services, or other personal consumer reports` have substantial semantic overlap, making fine-grained distinctions difficult.
+3. **Natural Spelling and Grammatical Errors**: Customers write informally, introducing typos and grammatical inconsistencies that increase vocabulary noise.
 
 ### Preprocessing Implications
-- Since the text has zero variance outside these 10 sentences, tokenization will produce a closed set of sequences.
-- We will use post-padding with sequence length `15` to capture every word without truncation.
+- **Truncation**: With a maximum word length of 6,314 but a median of 141, using the maximum length as our sequence limit is computationally prohibitive. A max sequence length of **128 or 256** is recommended to cover the majority of the text while staying within memory budgets.
+- **Out-Of-Vocabulary (OOV) Handling**: Given the large vocabulary (~80k words), many words in the validation/test sets will be unseen. We must use an explicit `<UNK>` token and might benefit from subword tokenizers or capping vocabulary by min-frequency (e.g., ignoring words appearing $< 5$ times).
