@@ -6,71 +6,55 @@ This document details the schema, data types, business meaning, and preprocessin
 
 ## 📋 Schema Definition
 
-The dataset contains 200,000 customer support tickets. Below is the metadata for all 30 columns.
+The raw database contains 1,282,355 consumer complaints. Below is the metadata for all 18 columns in `consumer-complaint-database.csv`.
 
-| Column | Data Type | Missing % | Description / Business Meaning |
-| :--- | :--- | :--- | :--- |
-| `ticket_id` | Integer | 0.00% | Unique identifier for each support ticket. |
-| `customer_name` | String | 0.00% | Full name of the customer. |
-| `customer_email` | String | 0.00% | Contact email address of the customer. |
-| `product` | Categorical | 0.00% | Product associated with the ticket (10 unique products). |
-| `category` | Categorical | 0.00% | **Primary Target**. The classification category of the ticket. |
-| `issue_description` | Text | 0.00% | **Primary Input**. Raw text description of the customer's problem. |
-| `resolution_notes` | Text | 0.00% | Text notes explaining how the ticket was resolved. |
-| `priority` | Categorical | 0.00% | **Secondary Target**. Priority level (Urgent, High, Medium, Low). |
-| `status` | Categorical | 0.00% | Lifecycle status of the ticket (Open, Closed, Resolved, etc.). |
-| `channel` | Categorical | 0.00% | Customer contact channel (Email, Chat, Social Media, etc.). |
-| `region` | Categorical | 0.00% | Geographical region of the customer. |
-| `customer_age` | Integer | 0.00% | Customer age in years. |
-| `customer_gender` | Categorical | 0.00% | Customer gender (Male, Female, Other). |
-| `subscription_type` | Categorical | 0.00% | Subscription tier (Free, Basic, Premium, Enterprise). |
-| `customer_tenure_months`| Integer | 0.00% | Number of months the customer has been active. |
-| `previous_tickets` | Integer | 0.00% | Count of past support tickets filed by this customer. |
-| `customer_satisfaction` | Integer | 0.00% | Customer satisfaction rating (1 to 5 stars). |
-| `first_response_time` | Float | 0.00% | Time elapsed (hours) before first agent response. |
-| `resolution_time_hours` | Float | 0.00% | Total time elapsed (hours) to resolve the ticket. |
-| `ticket_created_date` | Date/String | 0.00% | Date when the ticket was opened. |
-| `ticket_resolved_date` | Date/String | 0.00% | Date when the ticket was marked resolved. |
-| `escalated` | Categorical | 0.00% | Flag indicating if the ticket was escalated (Yes/No). |
-| `sla_breached` | Categorical | 0.00% | Flag indicating if the resolution breached SLA (Yes/No). |
-| `operating_system` | Categorical | 0.00% | Customer's operating system. |
-| `browser` | Categorical | 20.01% | Customer's web browser (40,023 missing values). |
-| `payment_method` | Categorical | 0.00% | Payment method on file. |
-| `language` | Categorical | 0.00% | Ticket language preference. |
-| `preferred_contact_time`| Categorical | 0.00% | Customer's preferred time of day for contact. |
-| `issue_complexity` | Integer | 0.00% | Complexity score rated by agent (1 to 10 scale). |
-| `customer_segment` | Categorical | 0.00% | Customer segment (Small Business, Corporate, Individual). |
+| Column | Data Type | Description / Business Meaning |
+| :--- | :--- | :--- |
+| `Date received` | Date/String | The date the complaint was received by the CFPB. |
+| `Product` | Categorical | **Primary Target (mapped to `category`)**. The financial service or product category (e.g., Mortgage, Credit card). |
+| `Sub-product` | Categorical | Specific sub-type of the product (e.g., Conventional home mortgage). |
+| `Issue` | Categorical | High-level type of complaint issue (e.g., Troubles during payment process). |
+| `Sub-issue` | Categorical | Detailed sub-type of the complaint issue. |
+| `Consumer complaint narrative` | Text | **Primary Input (mapped to `issue_description`)**. The free-text complaint description written by the consumer. |
+| `Company public response` | Categorical/Text | The company's public-facing response statement. |
+| `Company` | Categorical | Name of the financial company target of the complaint. |
+| `State` | Categorical | US State where the consumer resides. |
+| `ZIP code` | Categorical | ZIP code where the consumer resides. |
+| `Tags` | Categorical | Special tags (e.g., Servicemember, Older American). |
+| `Consumer consent provided?` | Categorical | Flag indicating if the consumer consented to publishing their narrative. |
+| `Submitted via` | Categorical | Submission channel (e.g., Web, Referral, Phone). |
+| `Date sent to company` | Date/String | Date when the complaint was forwarded to the company. |
+| `Company response to consumer` | Categorical | The outcome/response category from the company to the consumer. |
+| `Timely response?` | Categorical | Flag indicating if the company responded within the SLA time (Yes/No). |
+| `Consumer disputed?` | Categorical | Flag indicating if the consumer disputed the resolution (Yes/No). |
+| `Complaint ID` | Integer | Unique identifier for each complaint record. |
 
 ---
 
 ## 🎯 Target Definitions
 
-1. **Primary Target: `category`**
-   - 10 distinct ticket classes: `Feature Request`, `Subscription Cancellation`, `Performance Issue`, `Security Concern`, `Login Issue`, `Payment Problem`, `Bug Report`, `Refund Request`, `Data Sync Issue`, `Account Suspension`.
-2. **Secondary Target: `priority` (Multi-Task Extension)**
-   - 4 distinct classes: `Low`, `Medium`, `High`, `Urgent`.
+1. **Modeling Input: `issue_description`**
+   - Free-text consumer complaint narrative. All other metadata columns are dropped during ingestion to avoid overfitting, geographic/company bias, and data leakage.
+2. **Modeling Target: `category`**
+   - 18 distinct financial service categories mapped from the raw `Product` column.
 
 ---
 
-## ⚠️ Critical Analysis Findings (Statistical Independence)
+## ⚠️ Critical Analysis Findings (Class Imbalance)
 
 > [!WARNING]
-> Rigorous EDA (Chi-Squared Independence and ANOVA tests) reveals that **both target variables (`category` and `priority`) are statistically independent of all features, including the text input (`issue_description`)**. 
-> - All Chi-Squared p-values comparing `category` to categorical fields are $> 0.05$.
-> - All ANOVA p-values comparing `category` to numerical fields are $> 0.05$.
-> - The dataset contains exactly **10 unique issue descriptions** and **10 categories**, distributed uniformly (each description appears ~2,000 times for each category).
-
-### Pedagogical Implications for Deep Learning Study
-- **Random Chance Baseline**: The theoretical baseline accuracy for predicting `category` is **10%** (1 in 10 uniform classes).
-- **Overfitting Study**: This dataset offers a perfect playground to study **overfitting**. A high-capacity network (e.g., Deep BiLSTM) can easily memorize the mapping from text descriptions to targets on the training set, pushing training accuracy up, but its validation accuracy will remain hard-capped at **10%**.
-- **Model Evaluation**: Rather than comparing models purely on validation accuracy, we will evaluate models based on **learning dynamics (training loss convergence, generalization gaps)** and **inference profiles (speed, CPU latency, memory footprint, parameters)**.
+> Unlike synthetic datasets, the real-world CFPB dataset is **highly imbalanced**.
+> - The top two classes (`Debt collection` and `Credit reporting...`) account for **~45%** of the entire dataset.
+> - The bottom two classes (`Other financial service` and `Virtual currency`) account for **<0.1%** of the dataset combined.
+> - This class imbalance will require mitigation strategies in model building (e.g., class weights in CrossEntropyLoss, focal loss, or stratified batching) to ensure that the model doesn't overfit to major classes.
 
 ---
 
 ## ⚙️ Text Preprocessing Decisions
 
-1. **Inputs**: We only use `issue_description` as text input. Metadata fields will not be fed to the sequence model.
-2. **Cleaning**: Convert to lowercase, remove punctuation (except where punctuation can be a token like `?`), and split by whitespace.
-3. **Sequence Length**: The maximum word count is 13, and the minimum is 9. We will use a sequence length of 15 (with padding) to capture all words.
-4. **Padding & Truncation**: Use `post-padding` and `post-truncation` since sequences are short and highly uniform.
-5. **Vocabulary size**: Since there are only 10 unique sentences in the dataset, the lowercased vocabulary size is exactly **80 unique words**.
+1. **Cleaning**: Convert all text to lowercase, remove punctuation (except potentially specific symbols if using tokenizers), and split into word tokens.
+2. **Sequence Length**: 
+   - Words per narrative range from 1 to 6,314, with a median of 141.
+   - We will select a max sequence length of **128 or 256** (with padding/truncation) for recurrent models to balance context retention and compute efficiency.
+3. **Padding & Truncation**: Use `post-padding` and `post-truncation` for sequence alignment.
+4. **Vocabulary size**: ~79,605 unique words. We will restrict the active vocabulary by excluding rare words (e.g., keeping only words that appear $\ge 5$ times) to reduce model parameter count and prevent learning from noise.

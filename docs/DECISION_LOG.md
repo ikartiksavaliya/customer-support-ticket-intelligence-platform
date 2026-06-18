@@ -6,17 +6,17 @@ This log documents key structural, modeling, optimization, and preprocessing dec
 
 ## 🗒️ Log Entries
 
-### Decision 1: Focus on Single-Class Category Classification First
+### Decision 1: Focus on Single-Class Category Classification
 - **Status**: Approved
-- **Context**: The dataset has multiple potential classification targets, including `category` and `priority`.
-- **Decision**: Focus exclusively on `category` classification as the primary target. Introduce multi-task learning (category + priority) as an advanced extension (Phase X) after completing the core sequence models.
+- **Context**: The raw CFPB dataset has multiple target candidates, but we are designing this pipeline as a single-label multi-class classification problem.
+- **Decision**: Focus exclusively on `category` (18 classes) mapped from `Product`.
 - **Technical Rationale**: Keeps sequence model evaluations clean (RNN vs LSTM vs GRU vs BiLSTM) and avoids confounding optimization issues of multi-task prediction heads early in the learning process.
 
 ---
 
 ### Decision 2: Implementation of a CPU Benchmarking Pipeline
 - **Status**: Approved
-- **Context**: Deployment target requires efficient operation on local environments or low-cost clouds.
+- **Context**: The deployment target requires efficient operation on local environments or low-cost clouds.
 - **Decision**: Build an explicit inference benchmarks module reporting average inference latency (target < 100ms on CPU), throughput (tickets/sec), model parameter count, and memory footprint.
 - **Business Rationale**: Real-world routing needs to be fast and cost-effective; measuring parameter efficiency alongside F1-score provides a holistic engineering view.
 
@@ -30,8 +30,10 @@ This log documents key structural, modeling, optimization, and preprocessing dec
 
 ---
 
-### Decision 4: Dataset Independence Acknowledgement
+### Decision 4: Class Imbalance Mitigation Strategy
 - **Status**: Approved
-- **Context**: Exploratory analysis revealed that labels are independent of the input text.
-- **Decision**: Accept the statistical limitation of the synthetic dataset. Focus evaluation on training convergence speeds, generalization gaps (overfitting study), parameter efficiency, and latency benchmarks, expecting validation accuracy to stabilize around 10% (random guess).
-- **Pedagogical Rationale**: Prevents chasing false signals and instead centers the study on structural differences between Simple RNNs, LSTMs, and GRUs.
+- **Context**: Real-world CFPB customer complaints exhibit significant class imbalance (e.g., Debt Collection at 23% vs Virtual Currency at 0.004%). Standard training will bias the model towards major classes.
+- **Decision**: We will implement:
+  1. **Class-Weighted CrossEntropyLoss** to penalize misclassifications of minority classes.
+  2. **Evaluation Metrics**: Focus heavily on **Macro-averaged F1-score** and individual class precision/recall curves, rather than raw global accuracy.
+- **Pedagogical Rationale**: Handling class imbalance is a vital real-world ML engineering skill. This allows us to study the tradeoffs between minority class sensitivity and overall majority class performance.
