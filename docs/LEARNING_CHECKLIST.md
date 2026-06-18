@@ -9,14 +9,12 @@ A topic is only marked as **Complete [x]** when it has been fully **Explained** 
 ### 1. Sequential Data Modeling
 - [ ] **Sequential Data Basics** (What is sequential data, why order matters, temporal/context dependencies)
   - *Status*: `[ ] Explained | [ ] Implemented | [ ] Evaluated | [ ] Documented`
-- [ ] **Bag of Words vs Sequence** (Why BoW/TF-IDF loses temporal structure and context)
-  - *Status*: `[ ] Explained | [ ] Implemented | [ ] Evaluated | [ ] Documented`
 
 ### 2. Text Representation
-- [ ] **Tokenization & Vocabulary** (Text cleaning, splitting tokens, building vocab, integer mapping)
-  - *Status*: `[ ] Explained | [ ] Implemented | [ ] Evaluated | [ ] Documented`
-- [ ] **Sequence Length Handling** (Padding, truncation, padding tokens `[PAD]`, unknown tokens `[UNK]`)
-  - *Status*: `[ ] Explained | [ ] Implemented | [ ] Evaluated | [ ] Documented`
+- [x] **Tokenization & Vocabulary** (Text cleaning, splitting tokens, building vocab, integer mapping)
+  - *Status*: `[x] Explained | [x] Implemented | [x] Evaluated | [x] Documented`
+- [x] **Sequence Length Handling** (Padding, truncation, padding tokens `[PAD]`, unknown tokens `[UNK]`)
+  - *Status*: `[x] Explained | [x] Implemented | [x] Evaluated | [x] Documented`
 
 ### 3. Embeddings
 - [ ] **One-Hot vs Dense Embeddings** (Sparse high-dimensional vs dense low-dimensional representation)
