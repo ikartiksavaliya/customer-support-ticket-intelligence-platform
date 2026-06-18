@@ -19,6 +19,7 @@ __pycache__/
 .env
 
 # Data
+data/
 data/consumer-complaint-database.csv
 data/raw/
 data/interim/
