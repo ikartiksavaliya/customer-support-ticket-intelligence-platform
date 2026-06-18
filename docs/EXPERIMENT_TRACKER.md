@@ -17,15 +17,15 @@ All studies are evaluated under identical conditions:
 
 | ID | Study Type | Model / Config | Epochs | Train Loss | Val Loss | F1-Score | Inference Latency (ms) | Throughput (tk/sec) | Param Count | Memory Usage |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **EXP-01** | Baseline | TF-IDF + Logistic Reg | - | | | | | | | |
-| **EXP-02** | Architecture | Simple RNN (50d emb, 64h) | | | | | | | | |
-| **EXP-03** | Architecture | LSTM (50d emb, 64h) | | | | | | | | |
-| **EXP-04** | Architecture | GRU (50d emb, 64h) | | | | | | | | |
-| **EXP-05** | Architecture | BiLSTM (50d emb, 64h) | | | | | | | | |
-| **EXP-06** | Architecture | Deep BiLSTM (2-layer, 64h) | | | | | | | | |
-| **EXP-07** | Embeddings | GRU (100d emb, 64h) | | | | | | | | |
-| **EXP-08** | Embeddings | GRU (200d emb, 64h) | | | | | | | | |
-| **EXP-09** | Embeddings | GRU (300d emb, 64h) | | | | | | | | |
+| **EXP-01** | Embeddings | BoE (50d emb) | | | | | | | | |
+| **EXP-02** | Embeddings | BoE (100d emb) | | | | | | | | |
+| **EXP-03** | Embeddings | BoE (200d emb) | | | | | | | | |
+| **EXP-04** | Embeddings | BoE (300d emb) | | | | | | | | |
+| **EXP-05** | Architecture | Simple RNN (50d emb, 64h) | | | | | | | | |
+| **EXP-06** | Architecture | LSTM (50d emb, 64h) | | | | | | | | |
+| **EXP-07** | Architecture | GRU (50d emb, 64h) | | | | | | | | |
+| **EXP-08** | Architecture | BiLSTM (50d emb, 64h) | | | | | | | | |
+| **EXP-09** | Architecture | Deep BiLSTM (2-layer, 64h) | | | | | | | | |
 | **EXP-10** | Optimizers | GRU (SGD) | | | | | | | | |
 | **EXP-11** | Optimizers | GRU (RMSprop) | | | | | | | | |
 | **EXP-12** | Optimizers | GRU (AdamW) | | | | | | | | |

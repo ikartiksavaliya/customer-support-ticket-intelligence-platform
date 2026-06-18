@@ -8,7 +8,7 @@ This report summarizes the final performance, inference profiles, and computatio
 
 | Model ID | Model Name | Val F1-Score | Parameter Count | Avg Latency (CPU) | Throughput (tk/s) | Peak Memory |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **MODEL-v1** | TF-IDF + Logistic Reg | | | | | |
+| **MODEL-v1** | Bag of Embeddings (BoE) | | | | | |
 | **MODEL-v2** | Simple RNN | | | | | |
 | **MODEL-v3** | LSTM | | | | | |
 | **MODEL-v4** | GRU | | | | | |

@@ -51,7 +51,7 @@ customer-support-ticket-intelligence-platform/
 ## 📚 Sequence Modeling Learning Roadmap
 
 We follow a linear pedagogical sequence to model text:
-1. **Representations**: TF-IDF Baseline → Word Embeddings (Learned, Pretrained comparison).
+1. **Representations**: Exploratory Data Analysis → Word Embeddings (Dense Learned Embeddings, One-Hot vs. Dense, Dimension Sweeps).
 2. **Simple RNNs**: Explaining recurrence, hidden states, cell calculations, and vanishing gradients.
 3. **Gated RNNs**: Long Short-Term Memory (LSTM) cells and Gated Recurrent Units (GRU).
 4. **Advanced Recurrent Nets**: Bidirectional RNNs, Deep Stacked recurrent networks, and capacity/complexity tradeoffs.
