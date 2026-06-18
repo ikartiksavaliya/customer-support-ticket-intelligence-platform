@@ -1,0 +1,20 @@
+{
+  "Bank account or service": 0,
+  "Checking or savings account": 1,
+  "Consumer Loan": 2,
+  "Credit card": 3,
+  "Credit card or prepaid card": 4,
+  "Credit reporting": 5,
+  "Credit reporting, credit repair services, or other personal consumer reports": 6,
+  "Debt collection": 7,
+  "Money transfer, virtual currency, or money service": 8,
+  "Money transfers": 9,
+  "Mortgage": 10,
+  "Other financial service": 11,
+  "Payday loan": 12,
+  "Payday loan, title loan, or personal loan": 13,
+  "Prepaid card": 14,
+  "Student loan": 15,
+  "Vehicle loan or lease": 16,
+  "Virtual currency": 17
+}
