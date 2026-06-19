@@ -37,3 +37,15 @@ This log documents key structural, modeling, optimization, and preprocessing dec
   1. **Class-Weighted CrossEntropyLoss** to penalize misclassifications of minority classes.
   2. **Evaluation Metrics**: Focus heavily on **Macro-averaged F1-score** and individual class precision/recall curves, rather than raw global accuracy.
 - **Pedagogical Rationale**: Handling class imbalance is a vital real-world ML engineering skill. This allows us to study the tradeoffs between minority class sensitivity and overall majority class performance.
+
+---
+
+### Decision 5: Bag of Embeddings (BoE) as Sequence-Agnostic Baseline
+- **Status**: Approved
+- **Context**: Before building any recurrent model (RNN, LSTM, GRU), we need a baseline that uses learned embeddings but deliberately ignores word order.
+- **Decision**: MODEL-v1 is a **Bag of Embeddings** classifier: `nn.Embedding` → Masked Global Average Pooling → `nn.Linear`. It treats each document as an unordered collection of word vectors.
+- **Technical Rationale**:
+  1. **Lower bound**: Any sequence model (RNN, LSTM) that scores below BoE on F1 is broken — this baseline tests embedding quality in isolation.
+  2. **Teaches nn.Embedding mechanics** before adding recurrence: padding_idx, gradient flow through lookup tables, dimensionality tradeoffs.
+  3. **Fast to train**: No sequential bottleneck, enabling rapid embedding dimension sweeps (50d, 100d, 200d, 300d).
+- **Pedagogical Rationale**: Starting with a "dumb" baseline that ignores sequence order creates a clear motivation for why RNNs are needed — the performance gap between BoE and RNN models will directly quantify the value of sequential processing.
