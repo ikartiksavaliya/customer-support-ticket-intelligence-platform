@@ -13,7 +13,7 @@ Design Principles
     <UNK> = 1  →  unknown/rare words during inference map here
 - Serialisation uses plain JSON (not pickle) so the vocabulary file is
   human-readable and can be inspected with any text editor.
-- min_freq is a critical hyperparameter: see the notebook (02_text_preprocessing)
+- min_freq is a critical hyperparameter: see the notebook (03_text_preprocessing)
   for a sensitivity analysis showing its impact on OOV rate and embedding size.
 
 Usage
