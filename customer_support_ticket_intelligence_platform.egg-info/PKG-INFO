@@ -1,3 +1,10 @@
+Metadata-Version: 2.4
+Name: customer-support-ticket-intelligence-platform
+Version: 0.1.0
+Summary: Customer Support Ticket Intelligence Platform
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+
 # Customer Support Ticket Intelligence Platform
 
 A production-grade, portfolio-ready Deep Learning and Natural Language Processing (NLP) system designed to automate customer support ticket classification and priority routing. 

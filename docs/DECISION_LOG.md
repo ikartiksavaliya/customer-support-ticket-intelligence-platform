@@ -49,3 +49,32 @@ This log documents key structural, modeling, optimization, and preprocessing dec
   2. **Teaches nn.Embedding mechanics** before adding recurrence: padding_idx, gradient flow through lookup tables, dimensionality tradeoffs.
   3. **Fast to train**: No sequential bottleneck, enabling rapid embedding dimension sweeps (50d, 100d, 200d, 300d).
 - **Pedagogical Rationale**: Starting with a "dumb" baseline that ignores sequence order creates a clear motivation for why RNNs are needed — the performance gap between BoE and RNN models will directly quantify the value of sequential processing.
+
+---
+
+### Decision 6: pack_padded_sequence for Correct RNN Sequence Handling
+- **Status**: Approved
+- **Context**: Post-padded sequences (PAD=0 appended to the right) cause RNNs to process hundreds of meaningless zero-embedding tokens, washing out the hidden state (see INTERVIEW_NOTES.md Common Mistake #1).
+- **Decision**: Use `torch.nn.utils.rnn.pack_padded_sequence` in all RNN-based models. The `TicketDataset` returns sequence lengths via `return_lengths=True`, which are passed to the model's `forward()` method.
+- **Technical Rationale**: Packing tells the RNN to stop at the last *real* token for each sample. The returned `h_n` then corresponds to the hidden state at the actual sequence end, not at position `max_len`. This is critical for correctness — without it, the classification head receives a hidden state contaminated by 200+ PAD steps.
+
+---
+
+### Decision 7: Gradient Clipping for RNN Training Stability
+- **Status**: Approved
+- **Context**: Vanilla RNNs involve repeated multiplication by $W_{hh}$ during BPTT. When eigenvalues of $W_{hh} > 1$, gradients explode exponentially (see NLP_CONCEPT_NOTES.md, INTERVIEW_NOTES.md Q3 & Common Mistake #3).
+- **Decision**: Apply `torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)` after `loss.backward()` and before `optimizer.step()` for all recurrent models.
+- **Technical Rationale**: Gradient clipping caps the total gradient norm, preventing sudden NaN/divergence without altering the gradient direction. The threshold `max_norm=1.0` is a widely-used default. Note: clipping prevents *exploding* gradients but does NOT solve *vanishing* gradients — that requires architectural changes (LSTM/GRU).
+
+---
+
+### Decision 8: Multi-Environment Support, Package Installation, and Path Portability
+- **Status**: Approved
+- **Context**: The platform needs to run seamlessly across local development, VS Code with GPU support, and Google Colab (with CPU/GPU/TPU options). The old codebase suffered from `ModuleNotFoundError: No module named 'src'` on Colab due to inconsistent path configurations and absolute imports.
+- **Decision**:
+  1. Add `pyproject.toml` and `setup.py` to enable editable package installation (`pip install -e .`) so that the project module `src` becomes importable system-wide.
+  2. Implement `setup_colab()` and `get_device()` in `src/utils.py` to automatically detect, configure, and output environment settings, supporting CPU, CUDA GPU, and TPU (via `torch_xla`).
+  3. Integrate a unified **Notebook Bootstrap Cell** at the top of all notebooks to automate path setups and device detection consistently.
+  4. Rename `src/datasets.py` to `src/dataset.py` to match PEP-8 conventions for singular module naming, while preserving backward compatibility with `from src.datasets import *`.
+- **Technical Rationale**: Provides path portability, simplifies environment setup, and ensures reproducibility across diverse developer workspaces.
+

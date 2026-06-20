@@ -14,9 +14,8 @@ Design Principles
 - Checkpointing saves the model state_dict (not the full model object)
   for portability — the caller must re-instantiate the model class and
   call load_state_dict() to restore.  This is PyTorch best practice.
-- No gradient clipping is applied here — the BoE baseline has no
-  recurrence.  Gradient clipping will be added as a parameter in
-  Phase 5 when RNNs introduce the vanishing/exploding gradient risk.
+- Gradient clipping (max_grad_norm) is supported to prevent exploding
+  gradients in recurrent models.  See INTERVIEW_NOTES.md Common Mistake #3.
 
 Usage
 -----
@@ -54,6 +53,7 @@ def train_one_epoch(
     optimizer: torch.optim.Optimizer,
     criterion: nn.Module,
     device: torch.device,
+    max_grad_norm: Optional[float] = None,
 ) -> Tuple[float, List[int], List[int]]:
     """
     Train the model for one full pass over the training data.
@@ -70,6 +70,10 @@ def train_one_epoch(
         Loss function (e.g. CrossEntropyLoss with class weights).
     device : torch.device
         Target device ('cpu' or 'cuda').
+    max_grad_norm : float or None, optional
+        If set, clips the total gradient norm to this value after
+        each backward pass using torch.nn.utils.clip_grad_norm_().
+        Recommended: 1.0 for RNN models. None for BoE (no clipping).
 
     Returns
     -------
@@ -98,6 +102,11 @@ def train_one_epoch(
         # ── Backward pass ─────────────────────────────────────────────────
         optimizer.zero_grad()
         loss.backward()
+
+        # ── Gradient clipping (prevents exploding gradients in RNNs) ─────
+        if max_grad_norm is not None:
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
+
         optimizer.step()
 
         # ── Track metrics ─────────────────────────────────────────────────
@@ -184,6 +193,7 @@ def train_model(
     device: torch.device,
     epochs: int = 10,
     checkpoint_path: Optional[str] = None,
+    max_grad_norm: Optional[float] = None,
 ) -> Dict[str, List[float]]:
     """
     Train a model for multiple epochs with validation and optional checkpointing.
@@ -214,6 +224,9 @@ def train_model(
     checkpoint_path : str or None, optional
         If provided, saves the best model state_dict to this path
         whenever validation F1 improves.
+    max_grad_norm : float or None, optional
+        If set, clips gradient norms during training.  Recommended
+        1.0 for RNN models, None for BoE.
 
     Returns
     -------
@@ -241,7 +254,8 @@ def train_model(
 
         # ── Train ─────────────────────────────────────────────────────────
         train_loss, _, _ = train_one_epoch(
-            model, train_loader, optimizer, criterion, device
+            model, train_loader, optimizer, criterion, device,
+            max_grad_norm=max_grad_norm,
         )
 
         # ── Validate ──────────────────────────────────────────────────────

@@ -12,6 +12,23 @@ This guide provides instructions for setting up, configuring, and serving our cu
 - Python 3.8+
 
 ### Installation Steps
+
+You can set up the environment in one of three ways:
+
+#### Option A: Using the Local Setup Script (Recommended for Virtualenv)
+```bash
+# Run the automated setup script from the repository root
+./scripts/setup_local.sh
+```
+
+#### Option B: Using Conda (Recommended for Conda users)
+```bash
+# Create and activate environment from yml file
+conda env create -f environment.yml
+conda activate customer-support
+```
+
+#### Option C: Manual Installation
 ```bash
 # 1. Create and activate a fresh environment
 conda create -n ticket_intel python=3.10 -y
@@ -20,8 +37,9 @@ conda activate ticket_intel
 # 2. Install PyTorch (CPU version is sufficient for low-latency CPU serving)
 pip install torch --index-url https://download.pytorch.org/whl/cpu
 
-# 3. Install other requirements
-pip install pandas numpy streamlit matplotlib seaborn scikit-learn
+# 3. Install other requirements and setup editable package
+pip install -r requirements.txt
+pip install -e .
 ```
 
 ---

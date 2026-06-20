@@ -18,23 +18,27 @@ Design Principles
 
 Architecture Registry (from MODEL_EVOLUTION.md)
 -----------------------------------------------
-    MODEL-v1 : BagOfEmbeddings   (Phase 4 — this file)
-    MODEL-v2 : SimpleRNN         (Phase 5 — future)
-    MODEL-v3 : LSTMClassifier    (Phase 6 — future)
-    MODEL-v4 : GRUClassifier     (Phase 6 — future)
-    MODEL-v5 : BiLSTMClassifier  (Phase 7 — future)
-    MODEL-v6 : DeepBiLSTM        (Phase 7 — future)
+    MODEL-v1 : BagOfEmbeddings        (Phase 4 — this file)
+    MODEL-v2 : SimpleRNNClassifier    (Phase 5 — this file)
+    MODEL-v3 : LSTMClassifier         (Phase 6 — future)
+    MODEL-v4 : GRUClassifier          (Phase 6 — future)
+    MODEL-v5 : BiLSTMClassifier       (Phase 7 — future)
+    MODEL-v6 : DeepBiLSTM             (Phase 7 — future)
 
 Usage
 -----
-    from src.models import BagOfEmbeddings
+    from src.models import BagOfEmbeddings, SimpleRNNClassifier
 
     model = BagOfEmbeddings(vocab_size=23262, embedding_dim=50, num_classes=18)
     logits = model(input_ids)  # (batch, 18)
+
+    rnn = SimpleRNNClassifier(vocab_size=23262, embedding_dim=50, hidden_dim=64, num_classes=18)
+    logits = rnn(input_ids, seq_lengths)  # (batch, 18)
 """
 
 import torch
 import torch.nn as nn
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 
 class BagOfEmbeddings(nn.Module):
@@ -173,5 +177,178 @@ class BagOfEmbeddings(nn.Module):
         # ── Step 3: Linear Classification ─────────────────────────────────────
         # (batch, emb) → (batch, num_classes)
         logits = self.fc(pooled)
+
+        return logits
+
+
+# =============================================================================
+# MODEL-v2: Simple RNN Classifier (Phase 5)
+# =============================================================================
+
+class SimpleRNNClassifier(nn.Module):
+    """
+    Vanilla RNN classifier — MODEL-v2.
+
+    The first *sequence-aware* model in our architecture progression.
+    Unlike BagOfEmbeddings (which averages all embeddings regardless of
+    position), this model processes tokens **one at a time** in order,
+    maintaining a hidden state that accumulates context from left to right.
+
+    Why RNNs?
+    ---------
+    In natural language, word order matters.  Consider these two sentences:
+        - "The payment was deducted but the refund was issued."
+        - "The refund was issued but the payment was deducted."
+    A BoE model would produce identical representations (same words),
+    but an RNN can distinguish them because it processes tokens sequentially
+    and the hidden state at the end captures the *order* of events.
+
+    Architecture
+    ------------
+    ```
+    Input IDs (batch, max_len) + Lengths (batch,)
+         │
+         ▼
+    nn.Embedding(vocab_size, embedding_dim, padding_idx=0)
+         │
+         ▼
+    Embeddings (batch, max_len, embedding_dim)
+         │
+         ▼
+    pack_padded_sequence  ← skip PAD positions in the RNN computation
+         │
+         ▼
+    nn.RNN(input_size=embedding_dim, hidden_size=hidden_dim, batch_first=True)
+         │
+         ▼
+    Final Hidden State h_T (batch, hidden_dim)
+         │      ↑ extracted from the LAST REAL token, not the last PAD
+         ▼
+    nn.Linear(hidden_dim, num_classes)
+         │
+         ▼
+    Logits (batch, num_classes)
+    ```
+
+    Why pack_padded_sequence?
+    ------------------------
+    Without packing, the RNN processes PAD tokens (zero embeddings) through
+    the recurrence.  After 200+ PAD steps, the hidden state is dominated by
+    the bias term and tanh saturation, effectively washing out the real
+    text signal.  pack_padded_sequence tells PyTorch to skip PAD positions
+    entirely, so the final hidden state corresponds to the last *real* token.
+
+    Known Limitation: Vanishing Gradients
+    -------------------------------------
+    The RNN transition h_t = tanh(W_hh * h_{t-1} + W_xh * x_t + b) involves
+    repeated multiplication by W_hh during backpropagation.  For long
+    sequences, this causes gradients to either vanish (if eigenvalues of
+    W_hh < 1) or explode (if > 1).  This is studied in notebook 06.
+
+    Parameters
+    ----------
+    vocab_size : int
+        Total vocabulary size including special tokens (<PAD>=0, <UNK>=1).
+    embedding_dim : int
+        Dimensionality of the dense word embedding vectors.
+    hidden_dim : int
+        Number of hidden units in the RNN cell.
+    num_classes : int
+        Number of output classes (18 for CFPB categories).
+    """
+
+    def __init__(
+        self,
+        vocab_size: int,
+        embedding_dim: int,
+        hidden_dim: int,
+        num_classes: int,
+    ) -> None:
+        super().__init__()
+
+        self.hidden_dim = hidden_dim
+
+        # ── Embedding Layer ───────────────────────────────────────────────
+        # Same embedding configuration as BoE (padding_idx=0).
+        self.embedding = nn.Embedding(
+            num_embeddings=vocab_size,
+            embedding_dim=embedding_dim,
+            padding_idx=0,
+        )
+
+        # ── Recurrent Layer ──────────────────────────────────────────────
+        # batch_first=True: input shape is (batch, seq_len, embedding_dim)
+        # This is a single-layer vanilla RNN with tanh activation.
+        self.rnn = nn.RNN(
+            input_size=embedding_dim,
+            hidden_size=hidden_dim,
+            batch_first=True,
+        )
+
+        # ── Classification Head ──────────────────────────────────────────
+        self.fc = nn.Linear(hidden_dim, num_classes)
+
+    def forward(
+        self,
+        input_ids: torch.LongTensor,
+        seq_lengths: torch.LongTensor = None,
+    ) -> torch.Tensor:
+        """
+        Forward pass: embed → pack → RNN → extract last hidden → classify.
+
+        Parameters
+        ----------
+        input_ids : torch.LongTensor, shape (batch_size, max_len)
+            Integer-encoded, padded input sequences.
+        seq_lengths : torch.LongTensor, shape (batch_size,)
+            Actual (pre-padding) sequence lengths for each sample.
+            Required for pack_padded_sequence.
+            If None, assumes all positions are real tokens (no packing).
+
+        Returns
+        -------
+        logits : torch.Tensor, shape (batch_size, num_classes)
+            Raw (pre-softmax) class scores.
+        """
+        batch_size = input_ids.size(0)
+
+        # ── Step 1: Embedding Lookup ──────────────────────────────────────
+        # (batch, max_len) → (batch, max_len, embedding_dim)
+        embedded = self.embedding(input_ids)
+
+        # ── Step 2: Pack padded sequences ────────────────────────────────
+        # pack_padded_sequence requires lengths on CPU and sorted by
+        # descending length (enforce_sorted=False handles this for us).
+        if seq_lengths is not None:
+            packed = pack_padded_sequence(
+                embedded,
+                seq_lengths.cpu(),
+                batch_first=True,
+                enforce_sorted=False,
+            )
+        else:
+            packed = embedded
+
+        # ── Step 3: Initialize hidden state to zeros ────────────────────
+        # h_0 shape: (num_layers, batch_size, hidden_dim)
+        # Always start from zero — each batch is independent.
+        # See INTERVIEW_NOTES.md Common Mistake #2.
+        h_0 = torch.zeros(1, batch_size, self.hidden_dim, device=input_ids.device)
+
+        # ── Step 4: Run through RNN ──────────────────────────────────────
+        # output: all hidden states   (batch, seq_len, hidden_dim)
+        # h_n:    final hidden state   (1, batch, hidden_dim)
+        _, h_n = self.rnn(packed, h_0)
+
+        # ── Step 5: Extract final hidden state ───────────────────────────
+        # h_n is (1, batch, hidden_dim) → squeeze to (batch, hidden_dim)
+        # Because we used pack_padded_sequence, h_n corresponds to the
+        # hidden state at the LAST REAL TOKEN of each sequence, not the
+        # last PAD position.
+        h_final = h_n.squeeze(0)  # (batch, hidden_dim)
+
+        # ── Step 6: Linear Classification ───────────────────────────────
+        # (batch, hidden_dim) → (batch, num_classes)
+        logits = self.fc(h_final)
 
         return logits
