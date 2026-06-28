@@ -255,6 +255,17 @@ def setup_colab(mount_drive: bool = False, repo_url: str = None) -> None:
         subprocess.run(["git", "clone", repo_url, str(target_dir)], check=True)
     else:
         print(f"Repository already exists at {target_dir}")
+        import subprocess
+        try:
+            subprocess.run(["git", "-C", str(target_dir), "pull"], check=True)
+        except subprocess.CalledProcessError:
+            pass
+
+    try:
+        import subprocess
+        subprocess.run(["git", "-C", str(target_dir), "checkout", "feature/simple-rnn"], check=True)
+    except subprocess.CalledProcessError:
+        print("⚠️ Warning: Could not checkout branch feature/simple-rnn. Please ensure the branch is pushed to GitHub.")
 
     # 3. Add project root to sys.path and change directory
     os.chdir(str(target_dir))
@@ -264,14 +275,38 @@ def setup_colab(mount_drive: bool = False, repo_url: str = None) -> None:
     # 4. Install requirements automatically
     print("Installing requirements and installing project in editable mode...")
     import subprocess
-    subprocess.run([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"], check=True)
-    subprocess.run([sys.executable, "-m", "pip", "install", "-e", "."], check=True)
+
+    def run_pip(args, critical=True):
+        try:
+            subprocess.run([sys.executable, "-m", "pip"] + args, check=True)
+        except subprocess.CalledProcessError as e:
+            try:
+                # Retry with --break-system-packages for PEP 668 environments (e.g. newer Colab runtimes)
+                subprocess.run([sys.executable, "-m", "pip"] + args + ["--break-system-packages"], check=True)
+            except subprocess.CalledProcessError:
+                if critical:
+                    raise e
+                else:
+                    print(f"⚠️ Warning: pip command {' '.join(args)} failed, but proceeding anyway.")
+
+    if os.path.exists("requirements.txt"):
+        with open("requirements.txt", "r") as f:
+            reqs = f.read().splitlines()
+        # Exclude packages that can cause conflicts or are pre-installed in Google Colab (e.g. torch, jupyter)
+        exclude = {"torch", "torchvision", "torchaudio", "jupyter", "ipykernel"}
+        filtered_reqs = [r.strip() for r in reqs if r.strip() and not any(e in r.lower() for e in exclude)]
+        if filtered_reqs:
+            run_pip(["install"] + filtered_reqs, critical=True)
+    run_pip(["install", "-e", "."], critical=False)
 
     # 5. Verify imports
     try:
         from src.utils import set_seed
         from src.preprocessing import clean_text
-        from src.dataset import TicketDataset
+        try:
+            from src.dataset import TicketDataset
+        except ImportError:
+            from src.datasets import TicketDataset
         print("✅ Colab setup verified: imports are working perfectly!")
     except ImportError as e:
         print(f"❌ Verification failed: {e}")

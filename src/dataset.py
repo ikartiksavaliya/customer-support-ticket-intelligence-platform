@@ -8,8 +8,7 @@ Design Principles
 -----------------
 - TicketDataset wraps a pandas DataFrame and a Vocabulary; it does NOT load
   data from disk on every __getitem__ call — the DataFrame is kept in memory.
-- All encoding, truncation, and padding is done inside __getitem__ so that
-  the dataset object itself has zero preprocessing state beyond the vocab.
+- All encoding, truncation, and padding is done inside __init__.
 - Truncation is done PRE-truncation (keep the LAST max_len tokens).
   Rationale (from INTERVIEW_NOTES.md + DATASET_PROFILE.md):
     Consumer complaints in the CFPB corpus often begin with product
@@ -113,6 +112,39 @@ class TicketDataset(Dataset):
                     f"Found: {list(self._df.columns)}"
                 )
 
+        # Precompute and cache encoded IDs, sequence lengths, and labels in memory
+        self._precomputed_ids = []
+        self._precomputed_lengths = []
+        self._precomputed_labels = []
+
+        descriptions = self._df["issue_description"].tolist()
+        categories = self._df["category"].tolist()
+
+        for desc, cat in zip(descriptions, categories):
+            # ── Text processing ───────────────────────────────────────────────
+            cleaned = clean_text(desc)
+            tokens  = tokenize(cleaned)
+            ids     = self._vocab.encode(tokens)          # list[int]
+
+            # ── PRE-truncation (keep tail for richer complaint context) ──────
+            if len(ids) > self._max_len:
+                ids = ids[-self._max_len:]
+
+            # Record actual sequence length BEFORE padding (clamped to max_len)
+            # This is needed by pack_padded_sequence in RNN models.
+            seq_len = len(ids)
+
+            # ── POST-padding (zeros to the right) ────────────────────────────
+            pad_length = self._max_len - len(ids)
+            ids = ids + [self._vocab.PAD_IDX] * pad_length
+
+            # ── Label encoding ────────────────────────────────────────────────
+            label = self._label_encoder[cat]
+
+            self._precomputed_ids.append(ids)
+            self._precomputed_lengths.append(seq_len)
+            self._precomputed_labels.append(label)
+
     # ─────────────────────────────────────────────────────────────────────────
     # Dataset Protocol (required by torch.utils.data.Dataset)
     # ─────────────────────────────────────────────────────────────────────────
@@ -123,16 +155,12 @@ class TicketDataset(Dataset):
 
     def __getitem__(self, idx: int):
         """
-        Retrieve the encoded sample at position idx.
+        Retrieve the pre-processed and pre-encoded sample at position idx.
 
-        Processing pipeline per sample:
-            1. Read raw text and category from the DataFrame row.
-            2. Clean and tokenise the text.
-            3. Encode tokens → integer indices via Vocabulary (UNK for OOV).
-            4. PRE-truncate: if len(ids) > max_len, keep the LAST max_len ids.
-            5. POST-pad: if len(ids) < max_len, append PAD_IDX (0) to max_len.
-            6. Encode label from string → integer via label_encoder.
-            7. Return tuple (see below).
+        Processing pipeline is done once on initialization, so this is O(1):
+            1. Retrieve pre-computed token IDs, label index, and sequence length.
+            2. Convert to PyTorch LongTensors.
+            3. Return tuple (see below).
 
         Parameters
         ----------
@@ -151,27 +179,9 @@ class TicketDataset(Dataset):
             label     : torch.LongTensor, shape ()
             seq_len   : torch.LongTensor, shape () — actual non-PAD token count
         """
-        row = self._df.iloc[idx]
-
-        # ── Text processing ───────────────────────────────────────────────────
-        cleaned = clean_text(row["issue_description"])
-        tokens  = tokenize(cleaned)
-        ids     = self._vocab.encode(tokens)          # list[int]
-
-        # ── PRE-truncation (keep tail for richer complaint context) ──────────
-        if len(ids) > self._max_len:
-            ids = ids[-self._max_len:]
-
-        # Record actual sequence length BEFORE padding (clamped to max_len)
-        # This is needed by pack_padded_sequence in RNN models.
-        seq_len = len(ids)
-
-        # ── POST-padding (zeros to the right) ────────────────────────────────
-        pad_length = self._max_len - len(ids)
-        ids = ids + [self._vocab.PAD_IDX] * pad_length
-
-        # ── Label encoding ────────────────────────────────────────────────────
-        label = self._label_encoder[row["category"]]
+        ids = self._precomputed_ids[idx]
+        label = self._precomputed_labels[idx]
+        seq_len = self._precomputed_lengths[idx]
 
         input_ids_t = torch.tensor(ids,   dtype=torch.long)
         label_t     = torch.tensor(label, dtype=torch.long)
